@@ -1,0 +1,299 @@
+<html>
+
+<head>
+    <title>Vuex</title>
+    <!-- <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script> -->
+    <script src="https://unpkg.com/vuex@2.0.0"></script>
+    <script src="https://unpkg.com/vue/dist/vue.js"></script>
+    <script src="https://unpkg.com/vue-router/dist/vue-router.js"></script>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+    <style>
+
+        #app {
+            padding: 100px;
+        }
+        .router-link-active {
+            color: green;
+        }
+
+        .valid {
+            background-color: lightgreen;
+        }
+        .error {
+            background-color: rgb(223, 70, 70);
+        }
+
+    </style>
+</head>
+
+<body>
+
+    <div id="app" class="jumbotron">
+        <div style="padding: 50px;">
+            <h1> Status Logs</h1>
+            <nav class="navbar justify-content-center">
+                <ul class="nav nav-tabs">
+                    <li class="nav-item">
+                        <router-link id="link" to="/all">All Process</router-link>
+                    </li>
+                    <li class="nav-item">
+                        <router-link id="link" to="/mashing">Mashing Process</router-link>
+                    </li>
+                    <li class="nav-item">
+                        <router-link id="link" to="/boiling">Boiling Process</router-link>
+                    </li>
+                    <li class="nav-item">
+                        <router-link id="link" to="/fermentation">Fermentation Process</router-link>
+                    </li>
+                </ul>
+            </nav>
+            <router-view></router-view>
+        </div>
+
+    </div>
+    <script src="/socket.io/socket.io.js"></script>
+    <script type="text/x-template" id="status-table">
+        <table class="table">
+          <thead>
+            <tr>
+                <label for="filter">filter</label>
+                <select id="filter" v-model="currentFilter" style="margin-left: 9px;">
+                        <option value="valid">valid</option>
+                        <option value="warning">warning</option>
+                        <option value="error">error</option>
+                        <option value="" selected>All</option>
+                </select>
+            </tr>
+            <tr>
+                <th>Status</th>
+                <th>Message</th>
+                <th>Timestamp</th>
+                <th>Channel</th>
+            </tr>
+          </thead>
+          <tbody>       
+            <tr v-for="message in display" :class="{'valid': message.status == 'valid', 'warning': message.status == 'warning', 'error': message.status == 'error'}">
+                <td :class>{{message.status}}</td>
+                <td>{{message.message}}</td>
+                <td>{{message.timestamp}}</td>
+                <td>{{message.channel}}</td>
+            </tr>
+          </tbody>
+        </table>
+    </script>
+    <script>
+        let socket = io();
+        Vue.use(VueRouter)
+        Vue.use(Vuex)
+        const store = new Vuex.Store({
+            state: {
+                allMessages: [],
+                allStatus: [],
+                mashings: [],
+                boilings: [],
+                fermentations: [],
+                currentFilter: '',
+            },
+            getters: {
+                getAllStatusFiltered: (state) => (filter) => {
+                    return state.allStatus.filter(message => message.status === filter)
+                },
+                getMashingStatus: state => {
+                    return state.allStatus.filter(message => message.channel == "mashing");
+                },
+                getMashingStatusFiltered: (state) => (filter) => {
+                    return state.allStatus.filter(message => message.channel == "mashing" && message.status == filter);
+                },
+                getBoilingStatus: state => {
+                    return state.allStatus.filter(message => message.channel == "boiling");
+                },
+                getBoilingStatusFiltered: (state) => (filter) => {
+                    return state.allStatus.filter(message => message.channel == "boiling" && message.status == filter);
+                },
+                getFermentationStatus: state => {
+                    return state.allStatus.filter(message => message.channel == "fermentation");
+                },
+                getFermentationStatusFiltered: (state) => (filter) => {
+                    return state.allStatus.filter(message => message.channel == "fermentation" && message.status == filter);
+                },
+
+            },
+            mutations: {
+                update(state) {
+                    socket.on('allrecords', function (messages) {
+                        //console.log(messages)
+                        state.allMessages = messages
+                    });
+
+                },
+                showAll(state) {
+                    state.allStatus = []
+                    for (i in state.allMessages) {
+                        state.allStatus.unshift(state.allMessages[i])
+                    }
+                },
+
+            }
+        })
+        //All route
+        const All = {
+            template: '#status-table',
+            store,
+            data: function () {
+                return {
+                    filter: ''
+                }
+            },
+            computed: {
+                display() {
+                    store.commit('update');
+                    store.commit('showAll');
+                    if (this.currentFilter == "warning" || this.currentFilter == "error" || this.currentFilter == "valid") {
+                            console.log(this.currentFilter);
+                            //console.log(this.$store.getters.getAllStatusFiltered(this.currentFilter))
+                            return this.$store.getters.getAllStatusFiltered(this.currentFilter)
+                    }else{
+                            return this.$store.state.allStatus
+                    }
+                },
+                currentFilter: {
+                    get: function () {
+                        return this.filter;
+                    },
+                    set: function (value) {
+                        this.filter = value
+                    }
+                },
+            }
+               
+        }
+    
+
+        const mashComponent = {
+            template: '#status-table',
+            store,
+            data: function () {
+                return {
+                    filter: ''
+                }
+            },
+            computed: {
+                display() {
+                    store.commit('update');
+                    store.commit('showAll');
+                    if (this.currentFilter == "warning" || this.currentFilter == "error" || this.currentFilter == "valid"){
+                            return this.$store.getters.getMashingStatusFiltered(this.currentFilter)
+                    }else{
+                        return this.$store.getters.getMashingStatus
+                    }
+
+                },
+                currentFilter: {
+                    get: function () {
+                        return this.filter;
+                    },
+                    set: function (value) {
+                        this.filter = value
+                    }
+                },
+            }
+        }
+
+        const boilingComponent = {
+            template: '#status-table',
+            store,
+            data: function () {
+                return {
+                    filter: ''
+                }
+            },
+            computed: {
+                display() {
+                    store.commit('update');
+                    store.commit('showAll');
+                    if (this.currentFilter == "warning" || this.currentFilter == "error" || this.currentFilter == "valid") {
+                        return this.$store.getters.getBoilingStatusFiltered(this.currentFilter)
+                    }else{
+                        return this.$store.getters.getBoilingStatus
+                    }
+                    
+                },
+                currentFilter: {
+                    get: function () {
+                        return this.filter;
+                    },
+                    set: function (value) {
+                        this.filter = value
+                    }
+                },
+            }
+        }
+
+        const fermentationComponent = {
+            template: '#status-table',
+            store,
+            data: function () {
+                return {
+                    filter: ''
+                }
+            },
+            computed: {
+                display() {
+                    store.commit('update');
+                    store.commit('showAll');
+                    if (this.currentFilter == "warning" || this.currentFilter == "error" || this.currentFilter == "valid") {
+                        return this.$store.getters.getFermentationStatusFiltered(this.currentFilter)
+                    }else{
+                        return this.$store.getters.getFermentationStatus
+                    }
+                },
+                currentFilter: {
+                    get: function () {
+                        return this.filter;
+                    },
+                    set: function (value) {
+                        this.filter = value
+                    }
+                },
+            }
+        }
+
+        const router = new VueRouter({
+            mode: 'history',
+            routes: [
+                {
+                    path: '/',
+                    redirect: '/all'
+                },
+                {
+                    path: '/all',
+                    component: All
+                },
+                {
+                    path: '/mashing',
+                    component: mashComponent
+                },
+                {
+                    path: '/boiling',
+                    component: boilingComponent
+                },
+
+                {
+                    path: '/fermentation',
+                    component: fermentationComponent
+                }
+            ]
+        })
+
+        const app = new Vue({
+            el: '#app',
+            store,
+            router,
+
+        })
+
+    </script>
+</body>
+</html>
